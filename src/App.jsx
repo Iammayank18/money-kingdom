@@ -5,6 +5,7 @@ import { CAT, FLOORS, charName } from './lib/categories.js';
 import { CUR, TODAY } from './lib/dates.js';
 import { inr } from './lib/format.js';
 import { babuLine, stats, tier } from './lib/calc.js';
+import { blankLoanForm, blankRecForm } from './lib/forms.js';
 import { loanSum } from './lib/loans.js';
 import { charTips } from './lib/tips.js';
 import { cleanSettings } from './lib/backup.js';
@@ -39,6 +40,10 @@ export default function App() {
   const [toastState, setToastState] = useState(null);
   const [info, setInfo] = useState(null);
   const [pick, setPickState] = useState(null);
+  // drafts live here so they survive switching tabs, like the original
+  const [udForm, setUdForm] = useState(() => blankLoanForm('diya'));
+  const [partId, setPartId] = useState(null);
+  const [recForm, setRecForm] = useState(blankRecForm);
   const [tip, setTip] = useState(null); // character speech override: { text, until }
 
   const canvasRef = useRef(null);
@@ -258,6 +263,7 @@ export default function App() {
 
   const ctx = {
     data, mode, month, tab, setTab, filter, setFilter, wi, setWi, full, setFull, scene, info,
+    udForm, setUdForm, partId, setPartId, recForm, setRecForm,
     apply, toast, startOwn, openInfo, closeInfo, setMonth,
     onFormFocus: () => isPhone() && !full && setFull(true),
     onFormSubmitted: () => isPhone() && setTimeout(() => setFull(false), 60),

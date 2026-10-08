@@ -1,12 +1,12 @@
 import { useState } from 'react';
 import { useApp } from '../AppContext.js';
-import { TODAY, dayMonth, nextMonthDate } from '../lib/dates.js';
+import { TODAY, dayMonth } from '../lib/dates.js';
+import { blankLoanForm as blankForm } from '../lib/forms.js';
 import { inr, parseAmt, uid } from '../lib/format.js';
 import { dueChip, leftOf, loanSum, paidOf } from '../lib/loans.js';
 import NumField from '../components/NumField.jsx';
 import Empty from './Empty.jsx';
 
-const blankForm = (dir) => ({ dir, who: '', a: '', d: TODAY, due: nextMonthDate(), n: '' });
 
 function DueChip({ loan }) {
   const { kind, text } = dueChip(loan);
@@ -68,12 +68,10 @@ function LoanCard({ loan: l, partOpen, onAct }) {
 }
 
 export default function UdhaarPanel() {
-  const { data, mode, apply, toast, scene } = useApp();
+  const { data, mode, apply, toast, scene, udForm: form, setUdForm: setForm, partId, setPartId } = useApp();
   const L = data.loans;
   const sm = loanSum(L);
-  const [form, setForm] = useState(() => blankForm('diya'));
   const [err, setErr] = useState(null); // { field, msg }
-  const [partId, setPartId] = useState(null);
   const open = L.filter((l) => !l.closed).sort((a, b) => (a.due || '9999').localeCompare(b.due || '9999'));
   const done = L.filter((l) => l.closed).sort((a, b) => b.d.localeCompare(a.d));
   const set = (k) => (v) => {

@@ -6,6 +6,7 @@ import { inr, parseAmt, uid } from '../lib/format.js';
 import { stats } from '../lib/calc.js';
 import { backupText, downloadCsv, parseBackup } from '../lib/backup.js';
 import { lsClear, saveLsChar, saveTimeMode, timeMode } from '../lib/storage.js';
+import { blankRecForm } from '../lib/forms.js';
 import NumField from '../components/NumField.jsx';
 
 const TIMES = [
@@ -25,8 +26,7 @@ function PickRow({ label, cols, children }) {
 }
 
 function RecurringForm() {
-  const { mode, apply, toast } = useApp();
-  const [f, setF] = useState({ n: '', a: '', c: 'bills', d: '' });
+  const { apply, toast, recForm: f, setRecForm: setF } = useApp();
   const [err, setErr] = useState(null);
   const set = (k) => (v) => {
     setF((x) => ({ ...x, [k]: v }));
@@ -43,7 +43,7 @@ function RecurringForm() {
       return;
     }
     apply({ type: 'addRecurring', item: { id: uid(), n: n.slice(0, 40), a, c: f.c, day } });
-    setF({ n: '', a: '', c: f.c, d: '' });
+    setF(blankRecForm());
     toast(n + ' (' + inr(a) + ') har mahine ' + day + ' tareekh ko judega.');
   };
   return (
