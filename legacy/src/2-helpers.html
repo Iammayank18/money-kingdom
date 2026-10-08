@@ -1,0 +1,59 @@
+<script>
+/* ================= shared 3D helpers ================= */
+window.PMH=(function(){
+if(!window.THREE)return null;
+const clamp=(v,a=0,b=1)=>Math.min(b,Math.max(a,v));
+const lerp=(a,b,t)=>a+(b-a)*t;
+const smooth=(e0,e1,x)=>{const t=clamp((x-e0)/(e1-e0));return t*t*(3-2*t)};
+const reduced=!!(window.matchMedia&&matchMedia('(prefers-reduced-motion: reduce)').matches);
+const geoCache={};
+function rbox(w,h,d,r=0.1,s=3){
+  const k=[w,h,d,r,s].join('|');if(geoCache[k])return geoCache[k];
+  r=Math.min(r,w/2-0.001,h/2-0.001,d/2-0.001);
+  const shape=new THREE.Shape(),eps=0.00001,rad=r-eps;
+  shape.absarc(eps,eps,eps,-Math.PI/2,-Math.PI,true);
+  shape.absarc(eps,h-rad*2,eps,Math.PI,Math.PI/2,true);
+  shape.absarc(w-rad*2,h-rad*2,eps,Math.PI/2,0,true);
+  shape.absarc(w-rad*2,eps,eps,0,-Math.PI/2,true);
+  const g=new THREE.ExtrudeGeometry(shape,{depth:Math.max(0.0001,d-r*2),bevelEnabled:true,bevelSegments:s*2,steps:1,bevelSize:rad,bevelThickness:r,curveSegments:s});
+  g.center();g.computeVertexNormals();return geoCache[k]=g;
+}
+const mat=(c,o={})=>new THREE.MeshStandardMaterial(Object.assign({color:new THREE.Color(c),roughness:0.78,metalness:0},o));
+function mesh(geo,m,o={}){const x=new THREE.Mesh(geo,m);x.position.set(o.x||0,o.y||0,o.z||0);x.castShadow=o.cast!==false;x.receiveShadow=!!o.recv;return x;}
+const sph=(r,a=24,b=18)=>geoCache['s'+r+'_'+a]||(geoCache['s'+r+'_'+a]=new THREE.SphereGeometry(r,a,b));
+const V2=(x,y)=>new THREE.Vector2(x,y);
+const cA=new THREE.Color(),cB=new THREE.Color();
+const lerpCol=(t,a,b,k)=>t.copy(cA.set(a)).lerp(cB.set(b),k);
+const setS=(o,s)=>{o.scale.setScalar(Math.max(0.0001,s));o.visible=s>0.002;};
+function mulb(a){return function(){a|=0;a=a+0x6D2B79F5|0;let t=Math.imul(a^a>>>15,1|a);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296;};}
+function labelTex(txt,bg,fg,size=84){const c=document.createElement('canvas');c.width=c.height=128;const x=c.getContext('2d');if(bg){x.fillStyle=bg;x.fillRect(0,0,128,128);}x.fillStyle=fg;x.font='800 '+size+'px Figtree, system-ui, sans-serif';x.textAlign='center';x.textBaseline='middle';x.fillText(txt,64,70);const t=new THREE.CanvasTexture(c);return t;}
+const coinGeo=new THREE.CylinderGeometry(0.3,0.3,0.11,28);
+const coinMat=mat('#FFC94A',{roughness:0.32,metalness:0.4,emissive:new THREE.Color('#5a3d00'),emissiveIntensity:0.15});
+const goldMat=mat('#FFC531',{metalness:0.55,roughness:0.28,emissive:new THREE.Color('#5a3d00'),emissiveIntensity:0.18});
+function tree(x,z,s=1){const g=new THREE.Group();g.position.set(x,0,z);g.scale.setScalar(s);g.add(mesh(new THREE.CylinderGeometry(0.1,0.14,0.6,10),mat('#B98A63'),{y:0.3}));const m=mat('#6CCB8F');g.add(mesh(sph(0.5),m,{y:0.9}),mesh(sph(0.34),m,{x:0.22,y:1.25,z:0.05}));g.userData.m=m;g.userData.s=s;return g;}
+function cloud(c='#FFFFFF',o={}){const g=new THREE.Group(),m=mat(c,Object.assign({roughness:0.95},o));[[0,0,0,.6],[.55,-.1,.1,.45],[-.55,-.12,0,.42],[.2,.25,-.1,.42]].forEach(([x,y,z,r])=>g.add(mesh(sph(r),m,{x,y,z,cast:false})));g.userData.m=m;return g;}
+
+/* cartoon eye: white + pupil + highlight + eyelid cap. mood: open 0..1, sad 0..1 */
+function eye(r,lidColor,side){
+  const g=new THREE.Group();
+  g.add(mesh(sph(r,24,18),mat('#FFFFFF',{roughness:0.25}),{cast:false}));
+  const pupil=mesh(sph(r*0.56,20,16),mat('#1B1D22',{roughness:0.15}),{z:r*0.68,cast:false});pupil.scale.z=0.6;g.add(pupil);
+  const hl=mesh(sph(r*0.17,10,8),new THREE.MeshBasicMaterial({color:0xffffff}),{x:r*0.22,y:r*0.28,z:r*0.93,cast:false});g.add(hl);
+  const lidM=mat(lidColor);
+  const lidPivot=new THREE.Group();g.add(lidPivot);
+  const lid=mesh(new THREE.SphereGeometry(r*1.08,24,12,0,Math.PI*2,0,Math.PI/2),lidM,{cast:false});lidPivot.add(lid);
+  const lower=mesh(new THREE.SphereGeometry(r*1.07,24,12,0,Math.PI*2,Math.PI/2,Math.PI/2),lidM,{cast:false});lidPivot.add(lower);
+  const lowerPivot=lower;
+  let blinkT=1+Math.random()*3;
+  return {g,pupil,lidM,set(t,dt,open,sad,happy){
+    blinkT-=dt;let b=0;if(blinkT<0){b=1-Math.abs(blinkT+0.09)/0.09;if(blinkT<-0.18)blinkT=2.5+Math.random()*3;}
+    const o=clamp(open-Math.max(0,b));
+    lid.rotation.x=lerp(1.5,-1.2,o);            // 1.5 = closed, -1.2 = wide open
+    lidPivot.rotation.z=side*sad*0.42;            // sad tilt: inner corner up
+    lower.rotation.x=lerp(1.3,0.42,happy);        // happy: lower lid rises (smiling eyes)
+    pupil.position.y=-sad*r*0.18;
+  }};
+}
+return {THREE,clamp,lerp,smooth,reduced,rbox,mat,mesh,sph,V2,lerpCol,setS,mulb,labelTex,coinGeo,coinMat,goldMat,tree,cloud,eye};
+})();
+</script>
