@@ -135,3 +135,18 @@ describe('explain', () => {
     expect(explain('nope', data, CUR)).toBeNull();
   });
 });
+
+describe('reducer: loans', () => {
+  const loan = { id: 'L9', dir: 'diya', who: 'Z', a: 100, d: '2026-01-01', due: '', n: '', paid: [] };
+  it('updateLoans from demo starts own data with just the new loan', () => {
+    const s = reducer(initState(null), { type: 'updateLoans', fn: (ls) => [...ls, loan] });
+    expect(s.mode).toBe('local');
+    expect(s.data.loans).toEqual([loan]);
+  });
+  it('undo of one loan change leaves later changes alone', () => {
+    let s = reducer(initState(null), { type: 'updateLoans', fn: (ls) => [...ls, loan] });
+    s = reducer(s, { type: 'updateLoans', fn: (ls) => [...ls, { ...loan, id: 'L10' }] });
+    s = reducer(s, { type: 'updateLoans', fn: (ls) => ls.filter((x) => x.id !== 'L9') });
+    expect(s.data.loans.map((l) => l.id)).toEqual(['L10']);
+  });
+});

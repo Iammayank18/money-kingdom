@@ -46,8 +46,8 @@ export function reducer(state, a) {
     case 'delRecurring':
       return withSettings(state, { recurring: state.data.settings.recurring.filter((r) => r.id !== a.id) });
 
-    case 'setLoans':
-      return withData(own(state), { loans: a.loans });
+    case 'updateLoans': // a.fn: (loans) => loans, pure
+      return withData(own(state), { loans: a.fn(own(state).data.loans) });
 
     case 'restore':
       return { data: a.data, mode: 'local' };

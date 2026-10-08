@@ -82,11 +82,14 @@ export default function UdhaarPanel() {
   };
   const react = (kind) => scene && scene.react && scene.react(kind);
 
-  // `prev` is the loan list to restore on undo.
-  const save = (loans, prev, msg) => {
-    apply({ type: 'setLoans', loans });
-    if (msg) toast(msg, () => apply({ type: 'setLoans', loans: prev }));
+  // `fn` maps the loan list to its new value, `undo` maps it back. Both are applied to the live list,
+  // so undoing one change never clobbers a different change made since.
+  const save = (fn, undo, msg) => {
+    apply({ type: 'updateLoans', fn });
+    if (msg) toast(msg, () => apply({ type: 'updateLoans', fn: undo }));
   };
+  const swap = (id, next) => (ls) => ls.map((x) => (x.id === id ? next : x));
+  const restoreLoan = (l, idx) => (ls) => (ls.some((x) => x.id === l.id) ? ls.map((x) => (x.id === l.id ? l : x)) : [...ls.slice(0, idx), l, ...ls.slice(idx)]);
 
   const add = () => {
     const who = form.who.trim();
@@ -100,10 +103,9 @@ export default function UdhaarPanel() {
     }
     const wasDemo = mode === 'demo';
     const l = { id: uid(), dir: form.dir, who: who.slice(0, 40), a, d: d > TODAY ? TODAY : d, due: form.due, n: form.n.trim().slice(0, 60), paid: [] };
-    const prev = wasDemo ? [] : L;
     setForm(blankForm(form.dir));
     react(l.dir === 'diya' ? 'loanGive' : 'loanBack');
-    save([...prev, l], prev, (wasDemo ? 'Apna data shuru! ' : '') + inr(a) + ' ' + (l.dir === 'diya' ? who + ' ko diya' : who + ' se liya') + ' likh liya. Kharche mein nahi gina.');
+    save((ls) => [...ls, l], (ls) => ls.filter((x) => x.id !== l.id), (wasDemo ? 'Apna data shuru! ' : '') + inr(a) + ' ' + (l.dir === 'diya' ? who + ' ko diya' : who + ' se liya') + ' likh liya. Kharche mein nahi gina.');
   };
 
   const act = async (kind, l, amount) => {
@@ -111,13 +113,14 @@ export default function UdhaarPanel() {
       toast('Example data hai. "Apna data shuru karo" dabao, ya upar apna udhaar add karo.');
       return;
     }
-    const replace = (next) => L.map((x) => (x.id === l.id ? next : x));
+    const idx = L.findIndex((x) => x.id === l.id);
+    const back = restoreLoan(l, idx);
     const lent = l.dir === 'diya';
     const left = leftOf(l);
     if (kind === 'full') {
       react(lent ? 'loanBack' : 'loanGive');
       setPartId(null);
-      save(replace({ ...l, paid: [...(l.paid || []), { d: TODAY, a: left }], closed: true }), L, lent ? inr(left) + ' ' + l.who + ' se wapas aaya. Hisaab barabar!' : inr(left) + ' ' + l.who + ' ko lauta diya. Hisaab barabar!');
+      save(swap(l.id, { ...l, paid: [...(l.paid || []), { d: TODAY, a: left }], closed: true }), back, lent ? inr(left) + ' ' + l.who + ' se wapas aaya. Hisaab barabar!' : inr(left) + ' ' + l.who + ' ko lauta diya. Hisaab barabar!');
     } else if (kind === 'part') {
       setPartId(partId === l.id ? null : l.id);
     } else if (kind === 'partSave') {
@@ -126,11 +129,11 @@ export default function UdhaarPanel() {
       const amt = Math.min(amount, left);
       const next = { ...l, paid: [...(l.paid || []), { d: TODAY, a: amt }], closed: amt >= left ? true : l.closed };
       setPartId(null);
-      save(replace(next), L, inr(amt) + (lent ? ' wapas aaya' : ' lauta diya') + '. Ab ' + inr(leftOf(next)) + ' baaki.');
+      save(swap(l.id, next), back, inr(amt) + (lent ? ' wapas aaya' : ' lauta diya') + '. Ab ' + inr(leftOf(next)) + ' baaki.');
     } else if (kind === 'reopen') {
-      save(replace({ ...l, closed: false, paid: (l.paid || []).slice(0, -1) }), L, 'Udhaar dobara khul gaya.');
+      save(swap(l.id, { ...l, closed: false, paid: (l.paid || []).slice(0, -1) }), back, 'Udhaar dobara khul gaya.');
     } else if (kind === 'del') {
-      save(L.filter((x) => x.id !== l.id), L, 'Udhaar hata diya: ' + l.who + ' ' + inr(l.a));
+      save((ls) => ls.filter((x) => x.id !== l.id), back, 'Udhaar hata diya: ' + l.who + ' ' + inr(l.a));
     } else if (kind === 'remind') {
       const msg = 'Hi ' + l.who + '! ' + dayMonth(l.d) + ' ko jo ' + inr(l.a) + (l.n ? ' (' + l.n + ')' : '') + ' diye the, ' + (paidOf(l) ? 'unme se ' + inr(left) + ' baaki hai. ' : '') + 'jab ho sake lauta dena. Thanks!';
       try {
